@@ -1,0 +1,517 @@
+■333
+dbstudy=# create index empsal_idx on emp_huge(sal);
+CREATE INDEX
+dbstudy=#
+dbstudy=#
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE sal*1.1 < 1500;
+                                                QUERY PLAN
+-----------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..551.01 rows=3334 width=259) (actual time=0.014..8.779 rows=364 loops=1)
+   Filter: ((sal * 1.1) < 1500::numeric)
+   Rows Removed by Filter: 9637
+ Total runtime: 8.833 ms
+(4 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE sal < 1500/1.1;
+                                                         QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------
+ Index Scan using empsal_idx on emp_huge  (cost=0.29..32.65 rows=364 width=259) (actual time=0.117..0.304 rows=364 loops=1)
+   Index Cond: (sal < 1363.6363636363636364)
+ Total runtime: 0.345 ms
+(3 行)
+
+
+
+■334
+dbstudy=# create index empdate_idx on emp_huge(hiredate);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE TO_CHAR(hiredate,'YYYYMMDD') = '19801217';
+                                               QUERY PLAN
+--------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..576.02 rows=50 width=259) (actual time=0.185..21.200 rows=1 loops=1)
+   Filter: (to_char((hiredate)::timestamp with time zone, 'YYYYMMDD'::text) = '19801217'::text)
+   Rows Removed by Filter: 10000
+ Total runtime: 21.227 ms
+(4 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE hiredate = TO_DATE('19801217','YYYYMMDD');
+                                                       QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------
+ Index Scan using empdate_idx on emp_huge  (cost=0.29..8.30 rows=1 width=259) (actual time=0.069..0.071 rows=1 loops=1)
+   Index Cond: (hiredate = to_date('19801217'::text, 'YYYYMMDD'::text))
+ Total runtime: 0.101 ms
+(3 行)
+
+
+
+■335
+dbstudy=# create index empmgr_idx on emp_huge(mgr);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE mgr = 1;
+ERROR:  operator does not exist: character = integer
+行 3: WHERE mgr = 1;
+                ^
+HINT:  No operator matches the given name and argument type(s). You might need to add explicit type casts.
+
+
+キャストした場合
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE mgr = 1::text;
+                                              QUERY PLAN
+-------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..551.01 rows=50 width=259) (actual time=0.016..9.407 rows=1 loops=1)
+   Filter: ((mgr)::text = '1'::text)
+   Rows Removed by Filter: 10000
+ Total runtime: 9.435 ms
+(4 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE mgr = '1';
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Index Scan using empmgr_idx on emp_huge  (cost=0.29..8.30 rows=1 width=259) (actual time=0.058..0.059 rows=1 loops=1)
+   Index Cond: (mgr = '1'::bpchar)
+ Total runtime: 0.097 ms
+(3 行)
+
+
+
+
+■336
+dbstudy=# create index empdno_idx on emp_huge(deptno);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE deptno <> 30;
+                                              QUERY PLAN
+------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..526.01 rows=1 width=259) (actual time=0.010..5.380 rows=1 loops=1)
+   Filter: (deptno <> 30::numeric)
+   Rows Removed by Filter: 10000
+ Total runtime: 5.408 ms
+(4 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE deptno IN (SELECT deptno
+dbstudy(# FROM dept
+dbstudy(# WHERE deptno <> 30);
+                                                     QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------
+ Hash Join  (cost=1.13..614.65 rows=10001 width=259) (actual time=0.044..7.175 rows=1 loops=1)
+   Hash Cond: (emp_huge.deptno = dept.deptno)
+   ->  Seq Scan on emp_huge  (cost=0.00..501.01 rows=10001 width=264) (actual time=0.005..2.310 rows=10001 loops=1)
+   ->  Hash  (cost=1.09..1.09 rows=3 width=5) (actual time=0.026..0.026 rows=3 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 1kB
+         ->  HashAggregate  (cost=1.06..1.09 rows=3 width=5) (actual time=0.021..0.022 rows=3 loops=1)
+               ->  Seq Scan on dept  (cost=0.00..1.05 rows=3 width=5) (actual time=0.006..0.010 rows=3 loops=1)
+                     Filter: (deptno <> 30::numeric)
+                     Rows Removed by Filter: 1
+ Total runtime: 7.253 ms
+(10 行)
+
+★あれれ
+
+dbstudy=# set enable_hashjoin to off;
+SET
+dbstudy=# explain analyze
+SELECT ename FROM emp_huge
+WHERE deptno IN (SELECT deptno
+FROM dept
+WHERE deptno <> 30);
+                                                              QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------
+ Merge Semi Join  (cost=1.36..812.89 rows=10001 width=259) (actual time=0.048..9.869 rows=1 loops=1)
+   Merge Cond: (emp_huge.deptno = dept.deptno)
+   ->  Index Scan using empdno_idx on emp_huge  (cost=0.29..674.30 rows=10001 width=264) (actual time=0.018..4.323 rows=10001 loops=1)
+   ->  Sort  (cost=1.07..1.08 rows=3 width=5) (actual time=0.023..0.024 rows=3 loops=1)
+         Sort Key: dept.deptno
+         Sort Method: quicksort  Memory: 25kB
+         ->  Seq Scan on dept  (cost=0.00..1.05 rows=3 width=5) (actual time=0.006..0.009 rows=3 loops=1)
+               Filter: (deptno <> 30::numeric)
+               Rows Removed by Filter: 1
+ Total runtime: 9.928 ms
+(10 行)
+★9.3ではマージが選択されにくくなっている様子です。
+
+
+
+
+■337
+dbstudy=# create index ename_idx on emp_huge(ename);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE ename = 'DAIZEN'
+dbstudy-# OR
+dbstudy-# empno = 0;
+                                              QUERY PLAN
+------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..551.01 rows=2 width=259) (actual time=0.012..7.387 rows=1 loops=1)
+   Filter: ((ename = 'DAIZEN'::bpchar) OR (empno = 0::numeric))
+   Rows Removed by Filter: 10000
+ Total runtime: 7.418 ms
+(4 行)
+
+dbstudy=# create index empno_idx on emp_huge(empno);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE ename = 'DAIZEN'
+dbstudy-# OR
+dbstudy-# empno = 0;
+                                                       QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on emp_huge  (cost=8.71..16.32 rows=2 width=259) (actual time=0.127..0.127 rows=1 loops=1)
+   Recheck Cond: ((ename = 'DAIZEN'::bpchar) OR (empno = 0::numeric))
+   ->  BitmapOr  (cost=8.71..8.71 rows=2 width=0) (actual time=0.120..0.120 rows=0 loops=1)
+         ->  Bitmap Index Scan on ename_idx  (cost=0.00..4.42 rows=1 width=0) (actual time=0.076..0.076 rows=1 loops=1)
+               Index Cond: (ename = 'DAIZEN'::bpchar)
+         ->  Bitmap Index Scan on empno_idx  (cost=0.00..4.29 rows=1 width=0) (actual time=0.044..0.044 rows=1 loops=1)
+               Index Cond: (empno = 0::numeric)
+ Total runtime: 0.175 ms
+(8 行)
+
+
+
+
+■338
+
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE deptno NOT IN (20,30);
+                                              QUERY PLAN
+------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..526.01 rows=1 width=259) (actual time=0.014..7.544 rows=1 loops=1)
+   Filter: (deptno <> ALL ('{20,30}'::numeric[]))
+   Rows Removed by Filter: 10000
+ Total runtime: 7.577 ms
+(4 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE deptno IN (SELECT deptno
+dbstudy(# FROM dept
+dbstudy(# WHERE deptno NOT IN (20,30));
+                                                      QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------
+ Hash Join  (cost=1.09..589.61 rows=10001 width=259) (actual time=0.115..7.197 rows=1 loops=1)
+   Hash Cond: (emp_huge.deptno = dept.deptno)
+   ->  Seq Scan on emp_huge  (cost=0.00..501.01 rows=10001 width=264) (actual time=0.006..2.368 rows=10001 loops=1)
+   ->  Hash  (cost=1.07..1.07 rows=2 width=5) (actual time=0.076..0.076 rows=2 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 1kB
+         ->  Unique  (cost=1.06..1.07 rows=2 width=5) (actual time=0.069..0.071 rows=2 loops=1)
+               ->  Sort  (cost=1.06..1.06 rows=2 width=5) (actual time=0.068..0.068 rows=2 loops=1)
+                     Sort Key: dept.deptno
+                     Sort Method: quicksort  Memory: 25kB
+                     ->  Seq Scan on dept  (cost=0.00..1.05 rows=2 width=5) (actual time=0.015..0.018 rows=2 loops=1)
+                           Filter: (deptno <> ALL ('{20,30}'::numeric[]))
+                           Rows Removed by Filter: 2
+ Total runtime: 7.257 ms
+(13 行)
+
+dbstudy=# set enable_hashjoin to off;
+SET
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE deptno IN (SELECT deptno
+dbstudy(# FROM dept
+dbstudy(# WHERE deptno NOT IN (20,30));
+                                                              QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------
+ Merge Semi Join  (cost=1.35..775.36 rows=10001 width=259) (actual time=0.058..9.439 rows=1 loops=1)
+   Merge Cond: (emp_huge.deptno = dept.deptno)
+   ->  Index Scan using empdno_idx on emp_huge  (cost=0.29..674.30 rows=10001 width=264) (actual time=0.029..4.002 rows=10001 loops=1)
+   ->  Sort  (cost=1.06..1.06 rows=2 width=5) (actual time=0.020..0.020 rows=2 loops=1)
+         Sort Key: dept.deptno
+         Sort Method: quicksort  Memory: 25kB
+         ->  Seq Scan on dept  (cost=0.00..1.05 rows=2 width=5) (actual time=0.007..0.011 rows=2 loops=1)
+               Filter: (deptno <> ALL ('{20,30}'::numeric[]))
+               Rows Removed by Filter: 2
+ Total runtime: 9.495 ms
+(10 行)
+
+
+
+増えてきたので一旦index削除
+dbstudy=# drop index empdate_idx;
+dbstudy=# drop index empdno_idx;
+dbstudy=# drop index empmgr_idx;
+dbstudy=# drop index empno_idx;
+dbstudy=# drop index empsal_idx;
+dbstudy=# drop index ename_idx;
+
+
+
+
+
+
+■339
+dbstudy=# create index empjdcom_idx on emp_huge(job,deptno);
+CREATE INDEX
+dbstudy=# SELECT empno FROM emp_huge
+dbstudy-# WHERE job = 'AUTHOR' AND deptno = 10;
+ empno
+-------
+     0
+(1 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT empno FROM emp_huge
+dbstudy-# WHERE job = 'AUTHOR' AND deptno = 10;
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Index Scan using empjdcom_idx on emp_huge  (cost=0.29..8.30 rows=1 width=4) (actual time=0.017..0.019 rows=1 loops=1)
+   Index Cond: ((job = 'AUTHOR'::text) AND (deptno = 10::numeric))
+ Total runtime: 0.046 ms
+(3 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT empno FROM emp_huge
+dbstudy-# WHERE job = 'AUTHOR';
+                                                      QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------
+ Index Scan using empjdcom_idx on emp_huge  (cost=0.29..8.30 rows=1 width=4) (actual time=0.012..0.013 rows=1 loops=1)
+   Index Cond: (job = 'AUTHOR'::text)
+ Total runtime: 0.041 ms
+(3 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT empno FROM emp_huge
+dbstudy-# WHERE deptno = 10;
+                                                       QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------
+ Index Scan using empjdcom_idx on emp_huge  (cost=0.29..243.30 rows=1 width=4) (actual time=0.053..2.128 rows=1 loops=1)
+   Index Cond: (deptno = 10::numeric)
+ Total runtime: 2.154 ms
+(3 行)
+
+★まじですか！索引使っちゃったよ！
+★マニュアルをちゃんと読むと、「任意の部分集合」って書いてある・・・が、ほとんどの場合seqscanになるとも。
+
+
+deptnoがでてくるからまた索引消す
+dbstudy=# drop index empjdcom_idx;
+
+
+
+
+
+■340
+dbstudy=# create index empdno_idx on emp_huge(deptno);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT deptno,COUNT(empno) FROM emp_huge
+dbstudy-# GROUP BY deptno
+dbstudy-# HAVING deptno = 10;
+                                                        QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.29..8.32 rows=1 width=9) (actual time=0.062..0.063 rows=1 loops=1)
+   ->  Index Scan using empdno_idx on emp_huge  (cost=0.29..8.30 rows=1 width=9) (actual time=0.052..0.053 rows=1 loops=1)
+         Index Cond: (deptno = 10::numeric)
+ Total runtime: 0.130 ms
+(4 行)
+
+dbstudy=# SELECT deptno,COUNT(empno) FROM emp_huge
+dbstudy-# WHERE deptno = 10
+dbstudy-# GROUP BY deptno;
+ deptno | count
+--------+-------
+     10 |     1
+(1 行)
+
+dbstudy=# explain analyze
+dbstudy-# SELECT deptno,COUNT(empno) FROM emp_huge
+dbstudy-# WHERE deptno = 10
+dbstudy-# GROUP BY deptno;
+                                                        QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.29..8.32 rows=1 width=9) (actual time=0.019..0.019 rows=1 loops=1)
+   ->  Index Scan using empdno_idx on emp_huge  (cost=0.29..8.30 rows=1 width=9) (actual time=0.014..0.015 rows=1 loops=1)
+         Index Cond: (deptno = 10::numeric)
+ Total runtime: 0.060 ms
+(4 行)
+
+
+
+
+
+■341
+dbstudy=# drop index empdno_idx;
+DROP INDEX
+
+dbstudy=# create index empjhcom_idx on emp_huge(job,hiredate);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT hiredate FROM emp_huge
+dbstudy-# WHERE job = 'AUTHOR';
+                                                         QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using empjhcom_idx on emp_huge  (cost=0.29..4.30 rows=1 width=4) (actual time=0.066..0.067 rows=1 loops=1)
+   Index Cond: (job = 'AUTHOR'::text)
+   Heap Fetches: 0
+ Total runtime: 0.107 ms
+(4 行)
+
+
+★VACCUMあとで試す。
+
+
+
+■342
+dbstudy=# create index empno_idx on emp_huge(empno);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT ename FROM emp_huge
+dbstudy-# WHERE empno > 9000
+dbstudy-# ORDER BY empno;
+                                                         QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------
+ Index Scan using empno_idx on emp_huge  (cost=0.29..73.78 rows=1000 width=263) (actual time=0.074..0.721 rows=1000 loops=1)
+   Index Cond: (empno > 9000::numeric)
+ Total runtime: 0.874 ms
+(3 行)
+
+
+
+■343
+dbstudy=# create index empsal_idx on emp_huge(sal);
+CREATE INDEX
+dbstudy=# explain analyze
+SELECT DISTINCT sal
+FROM emp_huge;
+                                                                QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------
+ Unique  (cost=0.29..295.30 rows=10001 width=5) (actual time=0.075..10.049 rows=10001 loops=1)
+   ->  Index Only Scan using empsal_idx on emp_huge  (cost=0.29..270.30 rows=10001 width=5) (actual time=0.073..3.537 rows=10001 loops=1)
+         Heap Fetches: 0
+ Total runtime: 11.050 ms
+(4 行)
+
+
+
+
+■344
+dbstudy=# create index empdno_idx on emp_huge(deptno);
+CREATE INDEX
+dbstudy=# explain analyze
+dbstudy-# SELECT deptno,max(sal)
+dbstudy-# FROM emp_huge
+dbstudy-# WHERE deptno <> 10
+dbstudy-# GROUP BY deptno;
+                                                    QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=576.01..576.03 rows=2 width=10) (actual time=10.601..10.602 rows=1 loops=1)
+   ->  Seq Scan on emp_huge  (cost=0.00..526.01 rows=10000 width=10) (actual time=0.009..4.393 rows=10000 loops=1)
+         Filter: (deptno <> 10::numeric)
+         Rows Removed by Filter: 1
+ Total runtime: 10.649 ms
+(5 行)
+
+dbstudy=# set enable_hashagg to off;
+SET
+dbstudy=# explain analyze
+SELECT deptno,max(sal)
+FROM emp_huge
+WHERE deptno <> 10
+GROUP BY deptno;
+                                                              QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.29..749.32 rows=2 width=10) (actual time=14.476..14.476 rows=1 loops=1)
+   ->  Index Scan using empdno_idx on emp_huge  (cost=0.29..699.30 rows=10000 width=10) (actual time=0.076..8.698 rows=10000 loops=1)
+         Filter: (deptno <> 10::numeric)
+         Rows Removed by Filter: 1
+ Total runtime: 14.519 ms
+(5 行)
+
+
+
+
+■345
+dbstudy=# explain analyze
+dbstudy-# SELECT MAX(sal)
+dbstudy-# FROM emp_huge;
+                                                                      QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+ Result  (cost=0.31..0.32 rows=1 width=0) (actual time=0.045..0.045 rows=1 loops=1)
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.29..0.31 rows=1 width=5) (actual time=0.041..0.041 rows=1 loops=1)
+           ->  Index Only Scan Backward using empsal_idx on emp_huge  (cost=0.29..295.30 rows=10001 width=5) (actual time=0.040..0.040 rows=1 loops=1)
+                 Index Cond: (sal IS NOT NULL)
+                 Heap Fetches: 0
+ Total runtime: 0.079 ms
+(7 行)
+
+
+
+■346
+dbstudy=# explain analyze
+dbstudy-# SELECT COUNT(*)
+dbstudy-# FROM emp_huge;
+                                                                QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=295.30..295.31 rows=1 width=0) (actual time=4.045..4.045 rows=1 loops=1)
+   ->  Index Only Scan using empdno_idx on emp_huge  (cost=0.29..270.30 rows=10001 width=0) (actual time=0.027..2.513 rows=10001 loops=1)
+         Heap Fetches: 0
+ Total runtime: 4.098 ms
+(4 行)
+
+
+
+■347(例題をちょっと修正して、346のでIndex使わないように)
+dbstudy=# set enable_indexonlyscan to off;
+SET
+dbstudy=# set enable_indexscan to off;
+SET
+dbstudy=# explain analyze
+dbstudy-# SELECT COUNT(*)
+dbstudy-# FROM emp_huge;
+                                                    QUERY PLAN
+------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=526.01..526.02 rows=1 width=0) (actual time=3.841..3.841 rows=1 loops=1)
+   ->  Seq Scan on emp_huge  (cost=0.00..501.01 rows=10001 width=0) (actual time=0.006..2.271 rows=10001 loops=1)
+ Total runtime: 3.880 ms
+(3 行)
+
+
+
+
+■348(Index使わないはずの選択でIndex使ってくれるように)
+dbstudy=# select deptno,count(deptno) from emp_huge group by deptno;
+ deptno | count
+--------+-------
+     10 |     1
+     30 | 10000　　★列のほとんどが30なので、普通はseqscan
+(2 行)
+dbstudy=# explain analyze
+select * from emp_huge where deptno = 30;
+                                                  QUERY PLAN
+--------------------------------------------------------------------------------------------------------------
+ Seq Scan on emp_huge  (cost=0.00..526.01 rows=10000 width=294) (actual time=0.010..6.190 rows=10000 loops=1)
+   Filter: (deptno = 30::numeric)
+   Rows Removed by Filter: 1
+ Total runtime: 7.293 ms
+(4 行)
+dbstudy=# set enable_seqscan to off;
+SET
+dbstudy=# explain analyze
+select * from emp_huge where deptno = 30;
+                                                           QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using empdno_idx on emp_huge  (cost=0.29..699.28 rows=10000 width=294) (actual time=0.065..4.103 rows=10000 loops=1)
+   Index Cond: (deptno = 30::numeric)
+ Total runtime: 4.831 ms
+(3 行)
+★結果短いじゃねーか！なんで？！原因追求はしてません！
