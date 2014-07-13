@@ -1,0 +1,439 @@
+------------------------------------------------------------
+■環境構築
+
+C:\Users\yyamasak>mysql -u root -p
+Enter password: ****
+
+mysql> create database dbstudy;
+mysql> exit;
+
+C:\Users\yyamasak>mysql -u root -f -D dbstudy -p < cretab_script_mysql.sql
+Enter password: ****
+
+------------------------------------------------------------
+■333
+
+use dbstudy;
+show create table emp_huge\G
+create index emp_huge_sal_idx on emp_huge(sal);
+show create table emp_huge\G
+
+select ename FROM emp_huge WHERE sal*1.1 < 1500;
+select ename FROM emp_huge WHERE sal < 1500/1.1;
+
+explain select ename FROM emp_huge WHERE sal*1.1 < 1500;
+explain select ename FROM emp_huge WHERE sal < 1500/1.1;
+
+
+mysql> explain select ename FROM emp_huge WHERE sal*1.1 < 1500;
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 9849 | Using where |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql> explain select ename FROM emp_huge WHERE sal < 1500/1.1;
++----+-------------+----------+-------+------------------+------------------+---------+------+------+-----------------------+
+| id | select_type | table    | type  | possible_keys    | key              | key_len | ref  | rows | Extra                 |
++----+-------------+----------+-------+------------------+------------------+---------+------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | range | emp_huge_sal_idx | emp_huge_sal_idx | 5       | NULL |  364 | Using index condition |
++----+-------------+----------+-------+------------------+------------------+---------+------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■334
+
+use dbstudy;
+show create table emp_huge\G
+create index emp_huge_hiredate on emp_huge(hiredate);
+show create table emp_huge\G
+
+SELECT ename FROM emp_huge WHERE DATE_FORMAT(hiredate, '%y%m%d') = '801217';
+SELECT ename FROM emp_huge WHERE hiredate = STR_TO_DATE(801217,'%y%m%d');
+
+explain SELECT ename FROM emp_huge WHERE DATE_FORMAT(hiredate, '%y%m%d') = '801217';
+explain SELECT ename FROM emp_huge WHERE hiredate = STR_TO_DATE(801217,'%y%m%d');
+
+
+mysql> explain SELECT ename FROM emp_huge WHERE DATE_FORMAT(hiredate, '%y%m%d') = '801217';
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 9849 | Using where |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql> explain SELECT ename FROM emp_huge WHERE hiredate = STR_TO_DATE(801217,'%y%m%d');
++----+-------------+----------+------+-------------------+-------------------+---------+-------+------+-------+
+| id | select_type | table    | type | possible_keys     | key               | key_len | ref   | rows | Extra |
++----+-------------+----------+------+-------------------+-------------------+---------+-------+------+-------+
+|  1 | SIMPLE      | emp_huge | ref  | emp_huge_hiredate | emp_huge_hiredate | 4       | const |    1 | NULL  |
++----+-------------+----------+------+-------------------+-------------------+---------+-------+------+-------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■335
+
+use dbstudy;
+show create table emp_huge\G
+create index emp_huge_mgr on emp_huge(mgr);
+show create table emp_huge\G
+
+SELECT ename FROM emp_huge WHERE mgr=1;
+SELECT ename FROM emp_huge WHERE mgr='1';
+
+explain SELECT ename FROM emp_huge WHERE mgr=1;
+explain SELECT ename FROM emp_huge WHERE mgr='1';
+
+mysql> explain SELECT ename FROM emp_huge WHERE mgr=1;
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | ALL  | emp_huge_mgr  | NULL | NULL    | NULL | 9849 | Using where |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql>
+mysql> explain SELECT ename FROM emp_huge WHERE mgr='1';
++----+-------------+----------+------+---------------+--------------+---------+-------+------+-----------------------+
+| id | select_type | table    | type | possible_keys | key          | key_len | ref   | rows | Extra                 |
++----+-------------+----------+------+---------------+--------------+---------+-------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | ref  | emp_huge_mgr  | emp_huge_mgr | 13      | const |    1 | Using index condition |
++----+-------------+----------+------+---------------+--------------+---------+-------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■336
+
+use dbstudy;
+show create table emp_huge\G
+create index emp_huge_deptno on emp_huge(deptno);
+show create table emp_huge\G
+
+SELECT ename FROM emp_huge WHERE deptno <> 30;
+SELECT ename FROM emp_huge WHERE deptno IN (SELECT deptno FROM dept WHERE deptno <> 30);
+
+explain SELECT ename FROM emp_huge WHERE deptno <> 30;
+explain SELECT ename FROM emp_huge WHERE deptno IN (SELECT deptno FROM dept WHERE deptno <> 30);
+
+------------------------------------------------------------
+■337
+
+show create table emp_huge\G
+create index emp_huge_ename on emp_huge(ename);
+show create table emp_huge\G
+
+
+SELECT ename FROM emp_huge WHERE ename = 'DAIZEN' OR empno = 0;
+
+explain SELECT ename FROM emp_huge WHERE ename = 'DAIZEN' OR empno = 0;
+
+mysql> explain SELECT ename FROM emp_huge WHERE ename = 'DAIZEN' OR empno = 0;
++----+-------------+----------+------+----------------+------+---------+------+------+-------------+
+| id | select_type | table    | type | possible_keys  | key  | key_len | ref  | rows | Extra       |
++----+-------------+----------+------+----------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | ALL  | emp_huge_ename | NULL | NULL    | NULL | 9849 | Using where |
++----+-------------+----------+------+----------------+------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+show create table emp_huge\G
+create index emp_huge_empno on emp_huge(empno);
+show create table emp_huge\G
+
+
+SELECT ename FROM emp_huge WHERE ename = 'DAIZEN' OR empno = 0;
+
+mysql> explain SELECT ename FROM emp_huge WHERE ename = 'DAIZEN' OR empno = 0;
++----+-------------+----------+-------------+-------------------------------+-------------------------------+---------+------+------+---------------------------------------------------------+
+| id | select_type | table    | type        | possible_keys                 | key                           | key_len | ref  | rows | Extra                                                   |
++----+-------------+----------+-------------+-------------------------------+-------------------------------+---------+------+------+---------------------------------------------------------+
+|  1 | SIMPLE      | emp_huge | index_merge | emp_huge_ename,emp_huge_empno | emp_huge_ename,emp_huge_empno | 766,3   | NULL |    2 | Using union(emp_huge_ename,emp_huge_empno); Using where |
++----+-------------+----------+-------------+-------------------------------+-------------------------------+---------+------+------+---------------------------------------------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■338
+
+show create table emp_huge\G
+create index emp_huge_deptno on emp_huge(deptno);
+show create table emp_huge\G
+
+SELECT ename FROM emp_huge WHERE deptno NOT IN (20,30);
+SELECT ename FROM emp_huge WHERE deptno IN (SELECT deptno FROM dept WHERE deptno not in (20,30));
+
+explain SELECT ename FROM emp_huge WHERE deptno NOT IN (20,30);
+explain SELECT ename FROM emp_huge WHERE deptno IN (SELECT deptno FROM dept WHERE deptno not in (20,30));
+
+
+mysql> explain SELECT ename FROM emp_huge WHERE deptno NOT IN (20,30);
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+-----------------------+
+| id | select_type | table    | type  | possible_keys   | key             | key_len | ref  | rows | Extra                 |
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | range | emp_huge_deptno | emp_huge_deptno | 2       | NULL |    3 | Using index condition |
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql>
+mysql> explain SELECT ename FROM emp_huge WHERE deptno IN (SELECT deptno FROM dept WHERE deptno not in (20,30));
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+--------------------------------------------------------------------------+
+| id | select_type | table    | type  | possible_keys   | key             | key_len | ref  | rows | Extra                                 |
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+--------------------------------------------------------------------------+
+|  1 | SIMPLE      | emp_huge | range | emp_huge_deptno | emp_huge_deptno | 2       | NULL |    3 | Using index condition                                 |
+|  1 | SIMPLE      | dept     | ALL   | NULL            | NULL            | NULL    | NULL |    4 | Using where; FirstMatch(emp_huge); Using join buffer (Block Nested Loop) |
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+--------------------------------------------------------------------------+
+2 rows in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■339
+
+show create table emp_huge\G
+create index emp_huge_job_deptno on emp_huge(job,deptno);
+show create table emp_huge\G
+
+SELECT empno FROM emp_huge WHERE job = 'AUTHOR' AND deptno = 10;
+SELECT empno FROM emp_huge WHERE job = 'AUTHOR';
+SELECT empno FROM emp_huge WHERE deptno = 10;
+
+explain SELECT empno FROM emp_huge WHERE job = 'AUTHOR' AND deptno = 10;
+explain SELECT empno FROM emp_huge WHERE job = 'AUTHOR';
+explain SELECT empno FROM emp_huge WHERE deptno = 10;
+
+mysql> explain SELECT empno FROM emp_huge WHERE job = 'AUTHOR' AND deptno = 10;
++----+-------------+----------+------+---------------------+---------------------+---------+-------------+------+-----------------------+
+| id | select_type | table    | type | possible_keys       | key                 | key_len | ref         | rows | Extra                 |
++----+-------------+----------+------+---------------------+---------------------+---------+-------------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | ref  | emp_huge_job_deptno | emp_huge_job_deptno | 32      | const,const |    1 | Using index condition |
++----+-------------+----------+------+---------------------+---------------------+---------+-------------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql> explain SELECT empno FROM emp_huge WHERE job = 'AUTHOR';
++----+-------------+----------+------+---------------------+---------------------+---------+-------+------+-----------------------+
+| id | select_type | table    | type | possible_keys       | key                 | key_len | ref   | rows | Extra                 |
++----+-------------+----------+------+---------------------+---------------------+---------+-------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | ref  | emp_huge_job_deptno | emp_huge_job_deptno | 30      | const |    1 | Using index condition |
++----+-------------+----------+------+---------------------+---------------------+---------+-------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql> explain SELECT empno FROM emp_huge WHERE deptno = 10;
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 9849 | Using where |
++----+-------------+----------+------+---------------+------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+------------------------------------------------------------
+■340　※例題の例が、SQL文の使い方として不適切
+
+show create table emp_huge\G
+create index emp_huge_deptno on emp_huge(deptno);
+show create table emp_huge\G
+
+SELECT deptno, COUNT(empno) FROM emp_huge GROUP BY deptno HAVING deptno = 10;
+SELECT deptno, COUNT(empno) FROM emp_huge WHERE deptno = 10 GROUP BY deptno;
+
+explain SELECT deptno, COUNT(empno) FROM emp_huge GROUP BY deptno HAVING deptno = 10;
+explain SELECT deptno, COUNT(empno) FROM emp_huge WHERE deptno = 10 GROUP BY deptno;
+
+
+
+mysql> explain SELECT deptno, COUNT(empno) FROM emp_huge GROUP BY deptno HAVING deptno = 10;
++----+-------------+----------+-------+-------------------------------------+-----------------+---------+------+------+-------+
+| id | select_type | table    | type  | possible_keys                       | key             | key_len | ref  | rows | Extra |
++----+-------------+----------+-------+-------------------------------------+-----------------+---------+------+------+-------+
+|  1 | SIMPLE      | emp_huge | index | emp_huge_job_deptno,emp_huge_deptno | emp_huge_deptno | 2       | NULL | 9849 | NULL  |
++----+-------------+----------+-------+-------------------------------------+-----------------+---------+------+------+-------+
+1 row in set (0.00 sec)
+
+mysql>
+mysql> explain SELECT deptno, COUNT(empno) FROM emp_huge WHERE deptno = 10 GROUP BY deptno;
++----+-------------+----------+------+-------------------------------------+-----------------+---------+-------+------+----------------------------------------------+
+| id | select_type | table    | type | possible_keys                       | key             | key_len | ref   | rows | Extra                         |
++----+-------------+----------+------+-------------------------------------+-----------------+---------+-------+------+----------------------------------------------+
+|  1 | SIMPLE      | emp_huge | ref  | emp_huge_job_deptno,emp_huge_deptno | emp_huge_deptno | 2       | const |    1 | Using where; Using temporary; Using filesort |
++----+-------------+----------+------+-------------------------------------+-----------------+---------+-------+------+----------------------------------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■341
+
+show create table emp_huge\G
+create index emp_huge_job_hiredate on emp_huge(job,hiredate);
+show create table emp_huge\G
+
+SELECT hiredate FROM emp_huge WHERE job='AUTHOR';
+
+explain SELECT hiredate FROM emp_huge WHERE job='AUTHOR';
+
+
+mysql> explain SELECT hiredate FROM emp_huge WHERE job='AUTHOR';
++----+-------------+----------+------+-------------------------------------------+---------------------+---------+-------+------+-----------------------+
+| id | select_type | table    | type | possible_keys                             | key                 | key_len | ref   | rows | Extra            |
++----+-------------+----------+------+-------------------------------------------+---------------------+---------+-------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | ref  | emp_huge_job_deptno,emp_huge_job_hiredate | emp_huge_job_deptno | 30      | const |    1 | Using index condition |
++----+-------------+----------+------+-------------------------------------------+---------------------+---------+-------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
+■342
+
+show create table emp_huge\G
+create index emp_huge_empno on emp_huge(empno);
+show create table emp_huge\G
+
+SELECT ename FROM emp_huge WHERE empno > 9000 ORDER BY empno;
+
+explain SELECT ename FROM emp_huge WHERE empno > 9000 ORDER BY empno;
+
+
+mysql> explain SELECT ename FROM emp_huge WHERE empno > 9000 ORDER BY empno;
++----+-------------+----------+-------+----------------+----------------+---------+------+------+-----------------------+
+| id | select_type | table    | type  | possible_keys  | key            | key_len | ref  | rows | Extra                 |
++----+-------------+----------+-------+----------------+----------------+---------+------+------+-----------------------+
+|  1 | SIMPLE      | emp_huge | range | emp_huge_empno | emp_huge_empno | 3       | NULL |  999 | Using index condition |
++----+-------------+----------+-------+----------------+----------------+---------+------+------+-----------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+
+※索引が無い場合
+
+mysql> explain SELECT ename FROM emp_huge WHERE empno > 9000 ORDER BY empno;
++----+-------------+----------+------+---------------+------+---------+------+-------+-----------------------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows  | Extra                       |
++----+-------------+----------+------+---------------+------+---------+------+-------+-----------------------------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 10001 | Using where; Using filesort |
++----+-------------+----------+------+---------------+------+---------+------+-------+-----------------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+------------------------------------------------------------
+■343
+
+show create table emp_huge\G
+create index emp_huge_sal on emp_huge(sal);
+show create table emp_huge\G
+
+SELECT DISTINCT sal FROM emp_huge;
+
+explain SELECT DISTINCT sal FROM emp_huge;
+
+mysql> explain SELECT DISTINCT sal FROM emp_huge;
++----+-------------+----------+-------+---------------+--------------+---------+------+------+-------------+
+| id | select_type | table    | type  | possible_keys | key          | key_len | ref  | rows | Extra       |
++----+-------------+----------+-------+---------------+--------------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | index | emp_huge_sal  | emp_huge_sal | 5       | NULL | 9849 | Using index |
++----+-------------+----------+-------+---------------+--------------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+※索引が無い場合
+
+mysql> explain SELECT DISTINCT sal FROM emp_huge;
++----+-------------+----------+------+---------------+------+---------+------+-------+-----------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows  | Extra           |
++----+-------------+----------+------+---------------+------+---------+------+-------+-----------------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 10001 | Using temporary |
++----+-------------+----------+------+---------------+------+---------+------+-------+-----------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+------------------------------------------------------------
+■344
+
+show create table emp_huge\G
+create index emp_huge_deptno on emp_huge(deptno);
+show create table emp_huge\G
+
+SELECT deptno,max(sal) FROM emp_huge WHERE deptno <> 10 GROUP BY deptno;
+
+explain SELECT deptno,max(sal) FROM emp_huge WHERE deptno <> 10 GROUP BY deptno;
+
+mysql> explain SELECT deptno,max(sal) FROM emp_huge WHERE deptno <> 10 GROUP BY deptno;
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+-------------+
+| id | select_type | table    | type  | possible_keys   | key             | key_len | ref  | rows | Extra       |
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+-------------+
+|  1 | SIMPLE      | emp_huge | index | emp_huge_deptno | emp_huge_deptno | 2       | NULL | 9849 | Using where |
++----+-------------+----------+-------+-----------------+-----------------+---------+------+------+-------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+
+※索引が無い場合
+
+mysql> explain SELECT deptno,max(sal) FROM emp_huge WHERE deptno <> 10 GROUP BY deptno;
++----+-------------+----------+------+---------------+------+---------+------+-------+----------------------------------------------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows  | Extra                                        |
++----+-------------+----------+------+---------------+------+---------+------+-------+----------------------------------------------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 10001 | Using where; Using temporary; Using filesort |
++----+-------------+----------+------+---------------+------+---------+------+-------+----------------------------------------------+
+1 row in set (0.02 sec)
+
+mysql>
+
+
+------------------------------------------------------------
+■345
+
+show create table emp_huge\G
+create index emp_huge_sal on emp_huge(sal);
+show create table emp_huge\G
+
+SELECT MAX(sal) FROM emp_huge;
+
+explain SELECT MAX(sal) FROM emp_huge;
+
+
+mysql> explain SELECT MAX(sal) FROM emp_huge;
++----+-------------+-------+------+---------------+------+---------+------+------+------------------------------+
+| id | select_type | table | type | possible_keys | key  | key_len | ref  | rows | Extra                        |
++----+-------------+-------+------+---------------+------+---------+------+------+------------------------------+
+|  1 | SIMPLE      | NULL  | NULL | NULL          | NULL | NULL    | NULL | NULL | Select tables optimized away |
++----+-------------+-------+------+---------------+------+---------+------+------+------------------------------+
+1 row in set (0.00 sec)
+
+mysql>
+
+※索引が無い場合
+
+mysql> explain SELECT MAX(sal) FROM emp_huge;
++----+-------------+----------+------+---------------+------+---------+------+------+-------+
+| id | select_type | table    | type | possible_keys | key  | key_len | ref  | rows | Extra |
++----+-------------+----------+------+---------------+------+---------+------+------+-------+
+|  1 | SIMPLE      | emp_huge | ALL  | NULL          | NULL | NULL    | NULL | 9849 | NULL  |
++----+-------------+----------+------+---------------+------+---------+------+------+-------+
+1 row in set (0.00 sec)
+
+mysql>
+
+------------------------------------------------------------
