@@ -1,0 +1,149 @@
+------------------------------------------------------------
+■環境構築
+
+- employeeデータベースをダウンロード
+　http://dev.mysql.com/doc/index-other.html
+  　=> "Example Databases" -> "employee data (large dataset, includes data and test/verification suite)"
+
+- employeeデータベースのセットアップ例
+　　C:\Users\yyamasak> cd employees_db
+　　C:\Users\yyamasak\employees_db> mysql -u root -p < employees.sql
+　　Enter password: ****
+
+- employeeデータベースのセットアップ手順書(マニュアル)
+　http://dev.mysql.com/doc/employee/en/employees-installation.html
+
+------------------------------------------------------------
+[実行するクエリー]
+
+■サブクエリを使用
+select emp_no,salary,from_date,to_date from salaries where emp_no in (select emp_no from employees where hire_date < '1985-12-31');
+
+■サブクエリをJOINに書換え
+select s.emp_no,s.salary,s.from_date,s.to_date from salaries s INNER JOIN employees e ON (s.emp_no=e.emp_no) where e.hire_date < '1985-12-31';
+
+------------------------------------------------------------
+[実行時間比較]
+------------------------------------------------------------
+[MySQL 5.5]
+
+■サブクエリを使用
+mysql> select emp_no,salary,from_date,to_date from salaries where emp_no in (select emp_no from employees where hire_date < '1985-
+12-31');
++--------+--------+------------+------------+
+| emp_no | salary | from_date  | to_date    |
++--------+--------+------------+------------+
+|  10002 |  65828 | 1996-08-03 | 1997-08-03 |
+|  10002 |  65909 | 1997-08-03 | 1998-08-03 |
+|  10002 |  67534 | 1998-08-03 | 1999-08-03 |
+                  <snip>
++--------+--------+------------+------------+
+441975 rows in set (4.68 sec)
+
+mysql>
+mysql> explain select emp_no,salary,from_date,to_date from salaries where emp_no in (select emp_no from employees where hire_date
+< '1985-12-31');
++----+--------------------+-----------+-----------------+---------------+---------+---------+------+---------+-------------+
+| id | select_type        | table     | type            | possible_keys | key     | key_len | ref  | rows    | Extra       |
++----+--------------------+-----------+-----------------+---------------+---------+---------+------+---------+-------------+
+|  1 | PRIMARY            | salaries  | ALL             | NULL          | NULL    | NULL    | NULL | 2844513 | Using where |
+|  2 | DEPENDENT SUBQUERY | employees | unique_subquery | PRIMARY       | PRIMARY | 4       | func |       1 | Using where |
++----+--------------------+-----------+-----------------+---------------+---------+---------+------+---------+-------------+
+2 rows in set (0.00 sec)
+
+mysql>
+
+★★★★★★ EXPLAIN結果に"DEPENDENT SUBQUERY"が表示されている(※) ★★★★★★
+
+　※参考：なぜMySQLのサブクエリは遅いのか。
+　　http://nippondanji.blogspot.jp/2009/03/mysql_25.html
+
+
+■サブクエリをJOINに書換え
+mysql> select s.emp_no,s.salary,s.from_date,s.to_date from salaries s INNER JOIN employees e ON (s.emp_no=e.emp_no) where e.hire_d
+ate < '1985-12-31';
++--------+--------+------------+------------+
+| emp_no | salary | from_date  | to_date    |
++--------+--------+------------+------------+
+|  10002 |  65828 | 1996-08-03 | 1997-08-03 |
+|  10002 |  65909 | 1997-08-03 | 1998-08-03 |
+|  10002 |  67534 | 1998-08-03 | 1999-08-03 |
+                  <snip>
++--------+--------+------------+------------+
+441975 rows in set (0.71 sec)
+
+★★★★★★ サブクエリをJOINに書替えることで高速化(MySQL 5.5までは、このようなチューニングが必要) ★★★★★★
+
+
+mysql> explain select s.emp_no,s.salary,s.from_date,s.to_date from salaries s INNER JOIN employees e ON (s.emp_no=e.emp_no) where
+e.hire_date < '1985-12-31';
++----+-------------+-------+------+----------------+---------+---------+--------------------+--------+-------------+
+| id | select_type | table | type | possible_keys  | key     | key_len | ref                | rows   | Extra       |
++----+-------------+-------+------+----------------+---------+---------+--------------------+--------+-------------+
+|  1 | SIMPLE      | e     | ALL  | PRIMARY        | NULL    | NULL    | NULL               | 299920 | Using where |
+|  1 | SIMPLE      | s     | ref  | PRIMARY,emp_no | PRIMARY | 4       | employees.e.emp_no |      4 |             |
++----+-------------+-------+------+----------------+---------+---------+--------------------+--------+-------------+
+2 rows in set (0.00 sec)
+
+
+
+[MySQL 5.6]
+
+■サブクエリを使用
+mysql> select emp_no,salary,from_date,to_date from salaries where emp_no in (select emp_no from employees where hire_date < '1985-
+12-31');
++--------+--------+------------+------------+
+| emp_no | salary | from_date  | to_date    |
++--------+--------+------------+------------+
+|  10002 |  65828 | 1996-08-03 | 1997-08-03 |
+|  10002 |  65909 | 1997-08-03 | 1998-08-03 |
+|  10002 |  67534 | 1998-08-03 | 1999-08-03 |
+                  <snip>
++--------+--------+------------+------------+
+441975 rows in set (0.60 sec)
+
+mysql>
+
+★★★★★★ MySQL 5.6 の方が MySQL 5.5 よりも速い(0.60秒と4.68秒) ★★★★★★
+
+
+mysql> explain select emp_no,salary,from_date,to_date from salaries where emp_no in (select emp_no from employees where hire_date
+< '1985-12-31');
++----+-------------+-----------+------+----------------+---------+---------+----------------------------+--------+-------------+
+| id | select_type | table     | type | possible_keys  | key     | key_len | ref                        | rows   | Extra       |
++----+-------------+-----------+------+----------------+---------+---------+----------------------------+--------+-------------+
+|  1 | SIMPLE      | employees | ALL  | PRIMARY        | NULL    | NULL    | NULL                       | 299290 | Using where |
+|  1 | SIMPLE      | salaries  | ref  | PRIMARY,emp_no | PRIMARY | 4       | employees.employees.emp_no |      4 | NULL        |
++----+-------------+-----------+------+----------------+---------+---------+----------------------------+--------+-------------+
+2 rows in set (0.00 sec)
+
+mysql>
+
+★★★★★★ EXPLAIN結果に"DEPENDENT SUBQUERY"が無くなっている ★★★★★★
+
+
+■サブクエリをJOINに書換え
+mysql> select s.emp_no,s.salary,s.from_date,s.to_date from salaries s INNER JOIN employees e ON (s.emp_no=e.emp_no) where e.hire_d
+ate < '1985-12-31';
++--------+--------+------------+------------+
+| emp_no | salary | from_date  | to_date    |
++--------+--------+------------+------------+
+|  10002 |  65828 | 1996-08-03 | 1997-08-03 |
+|  10002 |  65909 | 1997-08-03 | 1998-08-03 |
+|  10002 |  67534 | 1998-08-03 | 1999-08-03 |
+                  <snip>
++--------+--------+------------+------------+
+441975 rows in set (0.62 sec)
+
+mysql>
+mysql> explain select s.emp_no,s.salary,s.from_date,s.to_date from salaries s INNER JOIN employees e ON (s.emp_no=e.emp_no) where
+e.hire_date < '1985-12-31';
++----+-------------+-------+------+----------------+---------+---------+--------------------+--------+-------------+
+| id | select_type | table | type | possible_keys  | key     | key_len | ref                | rows   | Extra       |
++----+-------------+-------+------+----------------+---------+---------+--------------------+--------+-------------+
+|  1 | SIMPLE      | e     | ALL  | PRIMARY        | NULL    | NULL    | NULL               | 299290 | Using where |
+|  1 | SIMPLE      | s     | ref  | PRIMARY,emp_no | PRIMARY | 4       | employees.e.emp_no |      4 | NULL        |
++----+-------------+-------+------+----------------+---------+---------+--------------------+--------+-------------+
+2 rows in set (0.00 sec)
+
+------------------------------------------------------------
